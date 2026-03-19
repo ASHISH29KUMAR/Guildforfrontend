@@ -25,10 +25,11 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/:type" element={<InfoPage />} />
+     
       <Route path="/" element={<Home />} />
       <Route path="/lobby/:roomId" element={<Lobby />} />
-     <Route path="/game/:roomId" element={<Game />} />  
+     <Route path="/game/:roomId" element={<Game />} />
+     <Route path="/:type" element={<InfoPage />} />  
     </Routes>
   );
 }
