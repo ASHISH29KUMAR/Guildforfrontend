@@ -7,9 +7,14 @@ import Lobby from "./pages/lobby/lobbypage";
 import Game from "./pages/Game/Game";
 import InfoPage from "./pages/Home/InfoPage";
 import "./App.css";
-
+const API_URL ="https://guildfall-backend.onrender.com"
 function App() {
   const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => {
+    fetch(`${API_URL}/health`)
+      .then(() => console.log("Backend ready"))
+      .catch(() => console.log("Backend waking up..."));
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
