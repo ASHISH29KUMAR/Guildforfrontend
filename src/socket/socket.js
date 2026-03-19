@@ -1,19 +1,17 @@
 import { io } from "socket.io-client";
 
 /* =========================
-   SOCKET URL CONFIG (VITE SAFE)
+   SOCKET URL CONFIG
 ========================= */
 
-// Vite uses import.meta.env
 const SOCKET_URL =
-  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_BACKEND_URL || // ✅ correct name
   (import.meta.env.DEV
     ? "http://localhost:5080"
     : "https://artarena-backend.onrender.com");
 
-if (!SOCKET_URL) {
-  console.error("❌ VITE_SOCKET_URL is not defined.");
-}
+/* DEBUG */
+console.log("🌐 SOCKET URL:", SOCKET_URL);
 
 /* =========================
    SINGLETON SOCKET
@@ -21,18 +19,17 @@ if (!SOCKET_URL) {
 
 let socket = null;
 
-/**
- * ✅ Singleton Socket.IO Client
- * - Lazy initialized
- * - Shared across entire app
- * - StrictMode safe
- */
 export function getSocket() {
+
   if (!socket) {
+
     socket = io(SOCKET_URL, {
-      transports: ["websocket"], // Important for Render
+      transports: ["websocket"],
+
       autoConnect: false,
-      withCredentials: true,
+
+      /* ❌ REMOVE THIS (causes deployment issues) */
+      // withCredentials: true,
 
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -43,17 +40,19 @@ export function getSocket() {
     /* =========================
        DEBUG LOGS
     ========================== */
+
     socket.on("connect", () => {
-      console.log("🟢 Socket connected:", socket.id);
+      console.log("🟢 Connected:", socket.id);
     });
 
     socket.on("disconnect", (reason) => {
-      console.log("🔴 Socket disconnected:", reason);
+      console.log("🔴 Disconnected:", reason);
     });
 
     socket.on("connect_error", (err) => {
-      console.error("❌ Socket error:", err.message);
+      console.error("❌ Connection error:", err.message);
     });
+
   }
 
   return socket;

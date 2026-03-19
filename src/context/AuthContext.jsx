@@ -1,59 +1,93 @@
-import { io } from "socket.io-client";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { getSocket } from "../socket/socket";
+import { guestLogin, getMe } from "../api/auth.api";
 
-/* =========================
-   SOCKET URL CONFIG
-========================= */
+const AuthContext = createContext(null);
 
-const SOCKET_URL =
-  import.meta.env.VITE_BACKEND_URL || // ✅ correct name
-  (import.meta.env.DEV
-    ? "http://localhost:5080"
-    : "https://artarena-backend.onrender.com");
+export const AuthProvider = ({ children }) => {
+  const socket = getSocket();
 
-/* DEBUG */
-console.log("🌐 SOCKET URL:", SOCKET_URL);
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
-/* =========================
-   SINGLETON SOCKET
-========================= */
+  const authSentRef = useRef(false);
 
-let socket = null;
+  /* =================================================
+     LOAD OR CREATE USER
+  ================================================= */
+  useEffect(() => {
+    const init = async () => {
+      const token = localStorage.getItem("guildfall_token");
+      const guestId = localStorage.getItem("guildfall_guest_id");
 
-export function getSocket() {
+      // 🔐 Existing token → validate
+      if (token && token !== "undefined") {
+        try {
+          const res = await getMe();
+          setUser(res.data.user);
+          return;
+        } catch {
+          localStorage.removeItem("guildfall_token");
+          localStorage.removeItem("guildfall_guest_id");
+        }
+      }
 
-  if (!socket) {
+      // 👤 No valid token → create / reuse guest
+      try {
+        const res = await guestLogin(guestId);
+        const { user, token: newToken } = res.data;
 
-    socket = io(SOCKET_URL, {
-      transports: ["websocket"],
+        setUser(user);
 
-      autoConnect: false,
+        localStorage.setItem("guildfall_token", newToken);
+        localStorage.setItem("guildfall_guest_id", user._id);
+      } catch (err) {
+        console.error("Guest login failed:", err);
+      }
+    };
 
-      /* ❌ REMOVE THIS (causes deployment issues) */
-      // withCredentials: true,
+    init();
+  }, []);
 
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      timeout: 20000,
+  /* =================================================
+     SOCKET AUTH
+  ================================================= */
+  useEffect(() => {
+    if (!user?._id) return;
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    if (authSentRef.current) return;
+    authSentRef.current = true;
+
+    socket.emit("AUTH", { userId: user._id });
+
+    socket.once("AUTH_SUCCESS", () => {
+      setAuthReady(true);
     });
 
-    /* =========================
-       DEBUG LOGS
-    ========================== */
-
-    socket.on("connect", () => {
-      console.log("🟢 Connected:", socket.id);
+    socket.on("disconnect", () => {
+      authSentRef.current = false;
+      setAuthReady(false);
     });
 
-    socket.on("disconnect", (reason) => {
-      console.log("🔴 Disconnected:", reason);
-    });
+    return () => {
+      socket.off("AUTH_SUCCESS");
+      socket.off("disconnect");
+    };
+  }, [user?._id, socket]);
 
-    socket.on("connect_error", (err) => {
-      console.error("❌ Connection error:", err.message);
-    });
+  return (
+    <AuthContext.Provider value={{ user, setUser, authReady }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
-  }
-
-  return socket;
-}
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  return ctx;
+};
