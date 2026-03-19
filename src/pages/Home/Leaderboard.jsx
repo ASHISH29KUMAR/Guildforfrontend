@@ -20,7 +20,7 @@ export default function Leaderboard() {
 
       try {
 
-        const res = await fetch("http://localhost:5080/leaderboard");
+        const res = await  fetch(import.meta.env.VITE_API_URL);
 
         if (!res.ok) throw new Error("Failed to fetch");
 
